@@ -6,7 +6,7 @@ use alloc::format;
 
 use ds323x::{Datelike, Timelike};
 use embedded_hal::spi::{Mode, Phase, Polarity};
-use embedded_sdmmc::{Directory, File, SdCard, TimeSource, Timestamp, Volume, VolumeManager};
+use embedded_sdmmc::{Directory, File, SdCard, SdCardError, TimeSource, Timestamp, Volume, VolumeManager};
 use pac::SPI2;
 use stm32f1xx_hal::spi::Spi2NoRemap;
 // use embedded_sdmmc::{File, SdCard, TimeSource, Timestamp, Volume, VolumeManager};
@@ -21,7 +21,7 @@ pub const MODE: Mode = Mode {
 
 
 
- pub fn build(pins: Spi2Pins, spi_dev: SPI2, clocks: Clocks, delay: Delay<TIM2, 1000000>) -> Storage {
+ pub fn build(pins: Spi2Pins, spi_dev: SPI2, clocks: Clocks, delay: Delay<TIM2, 1000000>) -> Result<Storage,embedded_sdmmc::Error<SdCardError>> {
 
   let spi2 = Spi::spi2(
     spi_dev,
@@ -29,15 +29,15 @@ pub const MODE: Mode = Mode {
     MODE,
     1.MHz(),
     clocks,
-);
+  );
 
-  rprintln!("set up sdcard");
+  rprintln!("finish spi2 setup");
   // let sdmmc_spi = embedded_hal_bus::spi::RefCellDevice::new(&spi_bus, DummyCsPin, delay).unwrap();
   // only one SPI device on this bus, can we avoid using embedded_hal_bus?
 
   let sdcard = embedded_sdmmc::SdCard::new(spi2, pins.sd_card_chip_select, delay);
 
-  rprintln!("set up sdcard");
+  rprintln!("finished sdcard setup");
 
   return Storage::new(sdcard);
 
@@ -117,7 +117,7 @@ impl Storage {
 
   pub fn new(sd_card: RrivSdCard
     // , time_source: impl TimeSource //  a timesource passed in here could use unsafe access to internal RTC or i2c bus
-  ) -> Self {
+  ) -> Result<Self,embedded_sdmmc::Error<SdCardError>> {
 
     let time_source = RrivTimeSource::new(); // unsafe access to the board
                                                              // or global time var via interrupt
@@ -131,7 +131,11 @@ impl Storage {
     let result = volume_manager.open_volume(embedded_sdmmc::VolumeIdx(0));
     let volume = match result {
       Ok(volume0) =>   {rprintln!("Volume 0 Success: {:?}", volume0); volume0 },
-      Err(error) => panic!("Volume 0 error: {:?}", error),
+      Err(error) => {
+        rprintln!("Volume 0 error: {:?}", error);
+        return Err(error)
+        // panic!("sd card error");
+      }
     };
   
     // let volume = volume_manager.open_volume(embedded_sdmmc::VolumeIdx(0)).unwrap();
@@ -150,7 +154,7 @@ impl Storage {
     rprintln!("Root Dir: {:?}", root_dir);
     
 
-    Storage {
+    Ok(Storage {
       volume_manager,
       volume,
       filename: [b'\0'; 11],
@@ -158,7 +162,7 @@ impl Storage {
       root_dir: root_dir,
       cache: [b'\0'; CACHE_SIZE],
       next_position: 0
-    }
+    })
   }
 
   pub fn reopen_file(&mut self){

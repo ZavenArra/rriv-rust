@@ -670,11 +670,15 @@ impl BoardBuilder {
         let mut gpio = self.gpio.unwrap();        
         gpio.gpio6.make_push_pull_output(&mut gpio_cr.gpioc_crh);
 
-        
 
         // let one_wire_bus_rriv = OneWireGpio1 {
         //     one_wire
         // };
+
+    //    match self.storage {
+    //         Some(_) => todo!(),
+    //         None => todo!(),
+    //    }
 
 
         Board {
@@ -874,7 +878,7 @@ impl BoardBuilder {
         let gpioc = device_peripherals.GPIOC.split();
         let gpiod = device_peripherals.GPIOD.split();
 
-        let delay = cortex_m::delay::Delay::new(core_peripherals.SYST, 1000000);
+        let mut delay = cortex_m::delay::Delay::new(core_peripherals.SYST, 1000000); // something appears to be wrong with this delay
 
 
         // Set up pins
@@ -891,12 +895,15 @@ impl BoardBuilder {
             rgb_led_pins,
             serial_pins,
             spi1_pins,
-            spi2_pins,
+            mut spi2_pins,
             usb_pins,
-        ) = pin_groups::build(pins, &mut gpio_cr, delay);
+        ) = pin_groups::build(pins, &mut gpio_cr, &delay);
 
+ 
         let clocks =
             BoardBuilder::setup_clocks(&mut oscillator_control_pins, rcc.cfgr, &mut flash.acr);
+
+    
 
         // let mut delay: Option<SysDelay> = None;
         // unsafe {
@@ -906,6 +913,45 @@ impl BoardBuilder {
         // let mut delay = delay.unwrap();
 
         let mut delay: DelayUs<TIM3> = device_peripherals.TIM3.delay(&clocks);
+
+
+        // Make sure nothing is happening on the SPI lines
+        // spi2_pins.sd_card_chip_select.set_high();
+
+        // spi2_pins.sck.as_push_pull_output(&mut gpio_cr.gpiob_crh, |pin| {
+        //     pin.set_low();
+        // });
+
+        // spi2_pins.miso.as_push_pull_output(&mut gpio_cr.gpiob_crh, |pin| {
+        //     pin.set_low();
+        // });
+
+        // spi2_pins.mosi.as_push_pull_output(&mut gpio_cr.gpiob_crh, |pin| {
+        //     pin.set_low();
+        // });
+
+
+
+
+        let do_blinks = false; // these blinks codes crash the spi sdcard, so don't use them.
+        if do_blinks {
+  
+        spi2_pins.sck.as_push_pull_output(&mut gpio_cr.gpiob_crh, |pin| {
+            let speed = 200_u32;
+            pin.set_high();
+            delay.delay_ms(200_u32);
+
+            for i in 0..2  {
+                spi2_pins.sd_card_chip_select.set_high();
+                delay.delay_ms(speed);
+                spi2_pins.sd_card_chip_select.set_low();
+                delay.delay_ms(speed);
+                rprintln!("tick1");
+            }
+            pin.set_low();
+            delay.delay_ms(500_u32);
+        });
+        }
 
 
         BoardBuilder::setup_serial(
@@ -1022,7 +1068,23 @@ impl BoardBuilder {
 
         watchdog.feed();
 
-
+        if do_blinks {
+        spi2_pins.sck.as_push_pull_output(&mut gpio_cr.gpiob_crh, |pin| {
+            let speed: u32 = 50;
+            pin.set_high();
+            delay.delay_ms(200_u32);
+            for _i in 0..10  {
+                spi2_pins.sd_card_chip_select.set_high();
+                delay.delay_ms(speed);
+                spi2_pins.sd_card_chip_select.set_low();
+                delay.delay_ms(speed);
+                rprintln!("tick");
+            }
+            pin.set_low();
+            delay.delay_ms(200_u32);
+        });
+        watchdog.feed();
+        }
 
         // a basic idea is to have the struct for a given periphal take ownership of the register block that controls stuff there
         // then Board would have ownership of the feature object, and make changes to the the registers (say through shutdown) through the interface of that struct
@@ -1048,7 +1110,6 @@ impl BoardBuilder {
         self.oscillator_control = Some(OscillatorControl::new(oscillator_control_pins));
 
         self.gpio = Some(dynamic_gpio_pins);
-        self.gpio_cr = Some(gpio_cr);
 
         let delay2: DelayUs<TIM2> = device_peripherals.TIM2.delay(&clocks);
         // delay2.delay(2);
@@ -1062,6 +1123,25 @@ impl BoardBuilder {
         //     delay2,
         // );
 
+        if do_blinks {
+        spi2_pins.sck.as_push_pull_output(&mut gpio_cr.gpiob_crh, |pin| {
+            let speed: u32 = 200;
+            pin.set_high();
+            delay.delay_ms(200_u32);
+            for _i in 0..3  {
+                spi2_pins.sd_card_chip_select.set_high();
+                delay.delay_ms(speed);
+                spi2_pins.sd_card_chip_select.set_low();
+                delay.delay_ms(speed);
+                rprintln!("tick3");
+            }
+            spi2_pins.sd_card_chip_select.set_high();
+            pin.set_low();
+            delay.delay_ms(500_u32);
+        });
+        watchdog.feed();
+        }
+
         let mut storage = storage::build(
             spi2_pins,
             device_peripherals.SPI2,
@@ -1070,8 +1150,12 @@ impl BoardBuilder {
         );
         // for SPI SD https://github.com/rust-embedded-community/embedded-sdmmc-rs
         rprintln!("{:?}", clocks);
+        
+        match storage {
+            Ok(storage) => self.storage = Some(storage),
+            Err(_) => {}, // storage will be null.
+        }
    
-        self.storage = Some(storage);
 
         // // let spi_mode = Mode {
         // //     polarity: Polarity::IdleLow,
@@ -1087,6 +1171,8 @@ impl BoardBuilder {
         rprintln!("{:?}", clocks);
 
         self.delay = Some(delay);
+        self.gpio_cr = Some(gpio_cr);
+
 
         // we can unsafely .steal on device peripherals to get rcc again, or not?
         // unsafe {
