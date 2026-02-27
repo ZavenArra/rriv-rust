@@ -33,7 +33,7 @@ const NUMBER_OF_MEASURED_PARAMETERS : usize = 1;
 pub struct ADCTemperatureDriver {
     general_config: SensorDriverGeneralConfiguration,
     special_config: ADCTemperatureDriverSpecialConfiguration,
-    measured_parameter_values: [f64; NUMBER_OF_MEASURED_PARAMETERS],
+    measured_parameter_values: [i32; NUMBER_OF_MEASURED_PARAMETERS],
 }
 
 impl SensorDriver for ADCTemperatureDriver {
@@ -60,10 +60,10 @@ impl SensorDriver for ADCTemperatureDriver {
     }
 
     fn get_measured_parameter_value(&mut self, index: usize) -> Result<f64, ()> {
-        if self.measured_parameter_values[index] == f64::MAX {
+        if self.measured_parameter_values[index] == i32::MAX {
             Err(())
         } else {
-            Ok(self.measured_parameter_values[index])
+            Ok(self.measured_parameter_values[index] as f64)
         }
     }
 
@@ -74,7 +74,7 @@ impl SensorDriver for ADCTemperatureDriver {
 
     fn take_measurement(&mut self, board: &mut dyn rriv_board::RRIVBoard) {
         
-        self.measured_parameter_values[0] = board.read_temp_adc() as f64; // example conversion
+        self.measured_parameter_values[0] = board.read_temp_adc(); // example conversion
     }
 
     fn clear_calibration(&mut self) {
@@ -101,7 +101,7 @@ impl ADCTemperatureDriver {
         ADCTemperatureDriver {
             general_config,
             special_config,
-            measured_parameter_values: [0.0; NUMBER_OF_MEASURED_PARAMETERS],
+            measured_parameter_values: [0; NUMBER_OF_MEASURED_PARAMETERS],
         }
     }
 
