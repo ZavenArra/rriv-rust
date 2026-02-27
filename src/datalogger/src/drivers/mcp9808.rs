@@ -175,7 +175,7 @@ impl SensorDriver for MCP9808TemperatureDriver {
 
     fn fit(&mut self, pairs: &[CalibrationPair]) -> Result<(), ()> {
        // validation
-       defmt::println!("pairs len {:?}", pairs.len());
+    //    defmt::println!("pairs len {:?}", pairs.len());
        if pairs.len() != 1 {
         return Err(());
        }
@@ -186,7 +186,7 @@ impl SensorDriver for MCP9808TemperatureDriver {
        let value = single.values[0];
        self.calibration_offset = point - value;
        self.special_config.calibration_offset = (self.calibration_offset  * 1000_f64) as i16;
-       defmt::println!("fit {}", self.special_config.calibration_offset);    
+    //    defmt::println!("fit {}", self.special_config.calibration_offset);   // f64, needs special formatter 
        Ok(())
     }
         

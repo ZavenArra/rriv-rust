@@ -1309,17 +1309,17 @@ impl BoardBuilder {
             // sd card library has no way to release the spi and pins
             // so unsafely get the cs pin and flash it
             unsafe {
-                let device_peripherals: pac::Peripherals = pac::Peripherals::steal();
-                let mut gpioc = device_peripherals.GPIOC.split();
-                let cs = gpioc.pc8;
-                let mut cs = cs.into_push_pull_output(&mut gpioc.crh);
-                for _i in 1..10 {
-                    cs.set_high();
-                    delay.delay_ms(100_u32);
-                    cs.set_low();
-                    delay.delay_ms(100_u32);
-                }
-                cs.set_high();
+                // let device_peripherals: pac::Peripherals = pac::Peripherals::steal();
+                // let mut gpioc = device_peripherals.GPIOC.split();
+                // let cs = gpioc.pc8;
+                // let mut cs = cs.into_push_pull_output(&mut gpioc.crh);
+                // for _i in 1..10 {
+                //     cs.set_high();
+                //     delay.delay_ms(100_u32);
+                //     cs.set_low();
+                //     delay.delay_ms(100_u32);
+                // }
+                // cs.set_high();
             }
         }
 

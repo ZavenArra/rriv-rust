@@ -32,11 +32,13 @@ impl SensorDriver for GenericAnalog {
             Err(_) => "Invalid",
         };
 
+
+
         json!({
            "id" : sensor_id,
            "type" : sensor_name,
-           "m": self.m, // return the converted value
-           "b" : self.b, // return the converted value
+        //    "m": self.m, // return the converted value
+        //    "b" : self.b, // return the converted value
            "sensor_port": self.special_config.sensor_port,
            "adc_select": adc_select
         })
@@ -88,7 +90,9 @@ impl SensorDriver for GenericAnalog {
     fn fit(&mut self, pairs: &[CalibrationPair]) -> Result<(), ()> {
         for i in 0..pairs.len() {
             let pair = &pairs[i];
-            defmt::println!("calib pair{:?} {} {}", i, pair.point, pair.values[0]);
+            // TODO this requies a speeial formatting call, since these are stored internall as floats
+            // TODO because we cannot format float without using too much flash in embedded
+            // defmt::println!("calib pair{:?} {} {}", i, pair.point, pair.values[0]);
         }
 
         if pairs.len() != 2 {
@@ -100,14 +104,14 @@ impl SensorDriver for GenericAnalog {
 
         self.m = (cal2.point - cal1.point) / (cal2.values[0] - cal1.values[0]);
         self.b = cal1.point - self.m * cal1.values[0];
-        defmt::println!("calibration: {} {}", self.m, self.b);
+        // defmt::println!("calibration: {} {}", self.m, self.b); // need special formatting calls
         self.special_config.m = self.m as f32;
         self.special_config.b = self.b as f32;
-        defmt::println!(
-            "calibration: {} {}",
-            self.special_config.m,
-            self.special_config.b
-        );
+        // defmt::println!( // needs special formatting call
+        //     "calibration: {} {}",
+        //     self.special_config.m,
+        //     self.special_config.b
+        // );
 
         Ok(())
     }

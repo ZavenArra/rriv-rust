@@ -181,7 +181,7 @@ impl SensorDriver for Ds18b20 {
                     Resolution::Bits10 => (raw_temp as f32) / 4.0,
                     Resolution::Bits9 => (raw_temp as f32) / 2.0,
                 };
-                defmt::println!("Temp C: {}", temperature);
+                defmt::println!("Temp C: {}", (temperature * 1000_f32) as u32); // needs special formatter
                 let value = temperature as f64;
                 self.measured_parameter_values[0] = value as f64;
                 self.measured_parameter_values[1] = self.m * value as f64 + self.b;
@@ -262,7 +262,7 @@ impl SensorDriver for Ds18b20 {
     fn fit(&mut self, pairs: &[CalibrationPair]) -> Result<(), ()> {
         for i in 0..pairs.len() {
             let pair = &pairs[i];
-            defmt::println!("calib pair{:?} {} {}", i, pair.point, pair.values[0]);
+            // defmt::println!("calib pair{:?} {} {}", i, pair.point, pair.values[0]);
         }
 
         if pairs.len() != 2 {
@@ -274,14 +274,14 @@ impl SensorDriver for Ds18b20 {
 
         self.m = (cal2.point - cal1.point) / (cal2.values[0] - cal1.values[0]);
         self.b = cal1.point - self.m * cal1.values[0];
-        defmt::println!("calibration: {} {}", self.m, self.b);
+        // defmt::println!("calibration: {} {}", self.m, self.b);
         self.special_config.m = self.m as f32;
         self.special_config.b = self.b as f32;
-        defmt::println!(
-            "calibration: {} {}",
-            self.special_config.m,
-            self.special_config.b
-        );
+        // defmt::println!(
+        //     "calibration: {} {}",
+        //     self.special_config.m,
+        //     self.special_config.b
+        // );
 
         Ok(())
     }

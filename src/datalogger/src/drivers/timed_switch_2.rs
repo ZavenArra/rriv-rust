@@ -405,8 +405,8 @@ impl SensorDriver for TimedSwitch2 {
             "on_time_s": self.special_config.on_time_s,
             "off_time_s": self.special_config.off_time_s,
             "gpio_pin": self.special_config.gpio_pin,
-            "period" : self.special_config.period,
-            "ratio" : self.special_config.ratio,
+            // "period" : self.special_config.period,
+            // "ratio" : self.special_config.ratio,
             "initial_state" : initial_state_str,        
         })
     }

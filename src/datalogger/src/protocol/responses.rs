@@ -31,9 +31,30 @@ pub fn calibration_point_list(board: &mut impl RRIVBoard, pairs: &Option<Box<[Ca
         for i in 0..pairs.len() {
             defmt::println!("calib pair{:?}", i);
             let pair = &pairs[i];
-            board.usb_serial_send(format_args!("{{'point': {}, 'values': [", pair.point));
+            let point = (pair.point * 1000f64) as u32;
+            
+            match util::format_decimal(point) {
+                Ok((buf, size)) => {
+                    let decimal = unsafe { core::str::from_utf8_unchecked(&buf[..size]) };
+                    board.usb_serial_send(format_args!("{{'point': {}, 'values': [", decimal));
+                },
+                Err(_) => {
+                    defmt::println!("error parsing decimal");
+                },
+            };
+            
             for i in 0..pair.values.len() {
-                board.usb_serial_send(format_args!("{}", pair.values[i]));
+                let value = (pair.values[i] * 1000f64) as u32; // try to avoid formatting a floating point
+                match util::format_decimal(value) {
+                    Ok((buf, size)) => {
+                        let decimal = unsafe { core::str::from_utf8_unchecked(&buf[..size]) };
+                        board.usb_serial_send(format_args!("{}", decimal));
+                    },
+                    Err(_) => {
+                        defmt::println!("error parsing decimal");
+                    },
+                };
+
                 if i < pair.values.len() - 1 {
                     board.usb_serial_send(format_args!(","));
                 }
