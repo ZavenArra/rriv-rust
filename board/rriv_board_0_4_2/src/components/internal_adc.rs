@@ -29,6 +29,7 @@ impl InternalAdcConfiguration {
   pub fn build(self, clocks: &Clocks) -> InternalAdc {
 
     let adc_device = self.adc_device;
+    
     let adc = adc::Adc::adc1(adc_device, *clocks);
     return InternalAdc::new(self.pins, adc);
   }
@@ -43,9 +44,9 @@ impl InternalAdc {
     }
   }
 
-  pub fn enable(&mut self, delay: &mut SysDelay) {
+  pub fn enable(&mut self, delay: &mut impl embedded_hal::blocking::delay::DelayMs<u32> ) {
     self.pins.enable_avdd.set_low();
-    delay.delay_ms(100_u16);
+    delay.delay_ms(100_u32);
   }
 
   pub fn disable(&mut self){
@@ -67,7 +68,11 @@ impl InternalAdc {
         2 => self.adc.read(&mut self.pins.channel2),
         3 => self.adc.read(&mut self.pins.channel3),
         4 => self.adc.read(&mut self.pins.channel4),
-        5 => self.adc.read(&mut self.pins.channel5),
+        5 => if let Some(channel5) = &mut self.pins.channel5 {
+          self.adc.read(channel5)
+        } else {
+          return Err(AdcError::ReadError)
+        }
         _ => return Err(AdcError::ReadError)
       };
 
@@ -89,6 +94,17 @@ impl InternalAdc {
     }
     
   }
+
+  pub fn read_tempertature(&mut self) -> i32 {
+    
+    let res = self.adc.read_temp();
+    return res;
+  }
+
+  pub fn take_port_5(&mut self) -> Pin<'C', 0, stm32f1xx_hal::gpio::Analog> {
+    return self.pins.take_port_5();
+  }
+
 
 
 }

@@ -2,14 +2,19 @@
 
 // codes and sensor names mapped to a sensor implementation
 
-use rriv_board::EEPROM_SENSOR_SETTINGS_SIZE;
-
-
 pub mod types;
 pub mod mcp9808;
 pub mod generic_analog;
 pub mod ring_temperature;
-pub mod heater;
+pub mod ring_w_mux;
+pub mod ring_temperature_sim;
+pub mod timed_switch_2;
 pub mod ds18b20;
-mod AHT22;
+pub mod k30_co2;
+pub mod atlas_ec;
+pub mod aht20;
+pub mod adc_temperature;
+pub mod resources;
+pub mod modbus;
+pub mod mhz9041a;
 

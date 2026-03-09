@@ -1,0 +1,92 @@
+name: Semantic Release
+
+on:
+  push:
+    branches:
+      - main
+      - next
+      - next-major
+      - beta
+      - alpha
+      - "[0-9]+.[0-9]+.x"
+      - "[0-9]+.x"
+      - "*preview-*"
+  pull_request:
+    types: [opened]
+ 
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    outputs:
+      new-release-published: ${{ steps.next-version.outputs.new-release-published }}
+      new-release-version: ${{ steps.next-version.outputs.new-release-version }}
+      new-release-git-tag: ${{ steps.next-version.outputs.new-release-git-tag }}
+
+    steps:
+
+    - uses: actions/checkout@v4
+      with:
+        ssh-key: ${{ secrets.CD_DEPLOY_KEY }}
+
+    - name: Configure Node.js
+      uses: actions/setup-node@v5
+      with:
+          node-version: lts/*
+
+    - name: Install Semantic Release
+      run: npm i -g semantic-release @semantic-release/{git,exec,changelog}
+
+    - name: Install Semantic-Release-Export Plugin
+      run: npm install --save-dev semantic-release-export-data
+
+    - name: Run Semantic Release
+      run: semantic-release
+      id: next-version
+      env:
+        GITHUB_TOKEN: ${{ secrets.RRIV_RUST_GH_TOKEN }}
+ 
+  build:
+    name: Publish binaries
+    if: ${{ needs.release.outputs.new-release-git-tag }}
+    runs-on: ubuntu-latest
+    needs: release
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.release.outputs.new-release-git-tag }}
+  
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        targets: thumbv7m-none-eabi
+
+    - name: Cargo build
+      run: cargo build --release
+      working-directory: board/app
+    
+    - name: Upload binaries to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: board/target/thumbv7m-none-eabi/release/app
+        asset_name: rriv-firmware.elf
+        tag: ${{ needs.release.outputs.new-release-git-tag }}
+        overwrite: true
+
+    - name: Cargo build debug
+      run: cargo build
+      working-directory: board/app
+    
+    - name: Upload binaries to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: board/target/thumbv7m-none-eabi/debug/app
+        asset_name: rriv-firmware-debug.elf
+        tag: ${{ needs.release.outputs.new-release-git-tag }}
+        overwrite: true
+          
+

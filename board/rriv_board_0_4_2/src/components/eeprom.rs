@@ -1,30 +1,29 @@
 
 use embedded_hal::prelude::{
-    _embedded_hal_blocking_i2c_Read, _embedded_hal_blocking_i2c_Write,
+    _embedded_hal_blocking_i2c_Write,
     _embedded_hal_blocking_i2c_WriteRead,
 };
 use crate::Board;
-use rriv_board::RRIVBoard;
-use rtt_target::{rprint, rprintln};
+use rriv_board::{RRIVBoard};
 
 // implementation specific consts
 const EEPROM_I2C_ADDRESS: u8 = 0x50;
 
 const _EEPROM_RESET_VALUE: u16 = 255; // max value of a byte
 
-const _EEPROM_UUID_ADDRESS_START: u8 = 0;
-const _EEPROM_UUID_ADDRESS_END: u8 = 15;
-const _UUID_LENGTH: u8 = 12; // STM32 has a 12 byte UUID, leave extra space for the future 16
 
 const EEPROM_DATALOGGER_SETTINGS_START: u8 = 16;
 const _EEPROM_SENSOR_SETTINGS_START: u8 = 80;
 
+const EEPROM_SERIAL_NUMBER_START: u8 = 0;
+
 
 pub fn write_bytes_to_eeprom(board: &mut crate::Board, block: u8, start_address: u8, bytes: &[u8]) {
     let device_address = EEPROM_I2C_ADDRESS + block;
-    let mut address = start_address;
+    let address = start_address;
+    let mut offset: u8 = 0;
     for byte in bytes {
-        let bytes_to_send = [address, *byte];
+        let bytes_to_send = [address + offset, *byte];
         match board
             .i2c1
             .as_mut()
@@ -36,14 +35,15 @@ pub fn write_bytes_to_eeprom(board: &mut crate::Board, block: u8, start_address:
                 board.delay_ms(5_u16);
             }
             Err(error) => {
-                rprintln!("write error: {:?}", error);
+                defmt::println!("write error: {:?}", defmt::Debug2Format(&error));
             }
         }
-        address = address + 1;
+        offset = offset + 1; // Last byte will crash
     }
-    rprintln!("done with EEPROM writes");
+    defmt::println!("done with EEPROM writes");
 }
 
+// you can pass a mut ref to i2c in here, don't need to pass the whole board
 pub fn read_bytes_from_eeprom(board: &mut crate::Board, block: u8, start_address: u8, buffer: &mut [u8]) {
         let mut i: usize = 0;
         let device_address = EEPROM_I2C_ADDRESS + block;
@@ -58,14 +58,28 @@ pub fn read_bytes_from_eeprom(board: &mut crate::Board, block: u8, start_address
                     buffer[i] = b[0];
                 }
                 Err(_) => {
-                    board.serial_send("EEPROM read failure, restarting");
-                    // board.restart();
-                    return;
-                } // what do we do if we fail?  panic?  retry?  restart the board?
+                    board.usb_serial_send(format_args!("EEPROM read failure, restarting"));
+                    panic!("EEPROM read failure");
+                }
             }
             i = i + 1;
         }
     
+}
+
+pub fn write_serial_number_to_eeprom(
+    board: &mut Board,
+    bytes: &[u8; rriv_board::EEPROM_SERIAL_NUMBER_SIZE],
+){
+    write_bytes_to_eeprom(board, 0, EEPROM_SERIAL_NUMBER_START, bytes);
+}
+
+pub fn read_serial_number_from_eeprom(
+    board: &mut Board
+) -> [u8; rriv_board::EEPROM_SERIAL_NUMBER_SIZE] {
+    let mut serial_number: [u8;rriv_board::EEPROM_SERIAL_NUMBER_SIZE] = [0;rriv_board::EEPROM_SERIAL_NUMBER_SIZE];
+    read_bytes_from_eeprom(board, 0, EEPROM_SERIAL_NUMBER_START, &mut serial_number);
+    return serial_number;
 }
 
 pub fn write_datalogger_settings_to_eeprom(
@@ -81,6 +95,7 @@ pub fn read_datalogger_settings_from_eeprom(board: &mut Board, buffer: &mut [u8]
 
 struct MemoryPosition {
     pub block: u8,
+    #[allow(unused)]
     pub offset: u8,
     pub address: u8
 }

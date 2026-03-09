@@ -1,5 +1,4 @@
-use cortex_m::asm;
-use stm32f1xx_hal::{timer::{Tim1NoRemap, Channel, PwmHz, Ch}, time::ms, pac::TIM1};
+use stm32f1xx_hal::{gpio::Alternate, pac::TIM1, time::ms, timer::{Ch, Channel, PwmHz, Tim1NoRemap}};
 
 use crate::*;
 
@@ -46,12 +45,10 @@ impl RgbLed {
 
   pub fn set_color(&mut self, red: u8, green: u8, blue: u8) {
 
-    let r = self.max as u32 * (red as u32);
-
     self.pwm.set_duty(Channel::C1, self.convert(red) );
     self.pwm.set_duty(Channel::C2, self.convert(green) );
     self.pwm.set_duty(Channel::C3, self.convert(blue) );
-    asm::bkpt();
+    // asm::bkpt();
 
   }
 

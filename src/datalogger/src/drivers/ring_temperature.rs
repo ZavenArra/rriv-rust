@@ -1,33 +1,27 @@
 // use alloc::fmt::format;
 
-use crate::any_as_u8_slice;
 use crate::sensor_name_from_type_id;
-use crate::sensor_type_id_from_name;
 
 use super::mcp9808::*;
 
 use super::types::*;
 use alloc::boxed::Box;
-use alloc::format;
-use rtt_target::rprint;
 use serde_json::json;
 
 // TODO: calibration offsets for all 6 sensors need to be stored and loaded into this driver, and written to EEPROM.
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct RingTemperatureDriverSpecialConfiguration {
-    calibration_offset: [i16; 8],
-    address_offset: u8,
-    empty: [u8; 23], // 32
+    calibration_offset: [i16; 8], // 16
+    address_offset: u8, // 1
 }
 
 impl RingTemperatureDriverSpecialConfiguration {
-    pub fn new_from_values(value: serde_json::Value) -> RingTemperatureDriverSpecialConfiguration {
-        Self {
+    pub fn parse_from_values(_value: serde_json::Value) -> Result<RingTemperatureDriverSpecialConfiguration, &'static str> {
+        Ok ( Self {
             calibration_offset: [0; 8],
             address_offset: 0,
-            empty: [b'\0'; 23],
-        } // Just using default address offset of 0 for now, need to optionally read from JSON
+        } ) // Just using default address offset of 0 for now, need to optionally read from JSON
     }
     pub fn new_from_bytes(
         bytes: [u8; SENSOR_SETTINGS_PARTITION_SIZE],
@@ -54,7 +48,7 @@ impl RingTemperatureDriver {
         special_config: RingTemperatureDriverSpecialConfiguration,
     ) -> Self {
         let mut addresses: [u8; TEMPERATURE_SENSORS_ON_RING] = [
-            0b0011000, 0b0011001, 0b0011010, 0b0011011, 0b0011100, 0b0011101,
+            0b0011000, 0b0011001, 0b0011110, 0b0011101, 0b0011010, 0b0011100,
         ];
         for i in 0..6 {
             addresses[i] = addresses[i] + special_config.address_offset;
@@ -114,19 +108,9 @@ impl RingTemperatureDriver {
 
 
 
-const INDEX_TO_BYTE_CHAR: [u8; TEMPERATURE_SENSORS_ON_RING] = [b'0', b'1', b'2', b'3', b'4', b'5'];
+const INDEX_TO_BYTE_CHAR: [u8; TEMPERATURE_SENSORS_ON_RING] = [b'A', b'B', b'C', b'D', b'E', b'F'];
 
 impl SensorDriver for RingTemperatureDriver {
-    fn get_configuration_bytes(&self, storage: &mut [u8; rriv_board::EEPROM_SENSOR_SETTINGS_SIZE]) {
-        // right now this just gets the bytes
-        // but the special settings probably should be consisted as member variables and copied back to the storage struct
-
-        let generic_settings_bytes: &[u8] = unsafe { any_as_u8_slice(&self.general_config) };
-        let special_settings_bytes: &[u8] = unsafe { any_as_u8_slice(&self.special_config) };
-
-        copy_config_into_partition(0, generic_settings_bytes, storage);
-        copy_config_into_partition(1, special_settings_bytes, storage);
-    }
 
     // TODO: this should come from a derived trait
     fn get_configuration_json(&mut self) -> serde_json::Value {
@@ -142,9 +126,9 @@ impl SensorDriver for RingTemperatureDriver {
         })
     }
 
-    fn setup(&mut self) {
+    fn setup(&mut self, board: &mut dyn rriv_board::RRIVBoard) {
         for i in 0..TEMPERATURE_SENSORS_ON_RING {
-            self.sensor_drivers[i].setup();
+            self.sensor_drivers[i].setup(board);
         }
     }
 
@@ -155,7 +139,7 @@ impl SensorDriver for RingTemperatureDriver {
     }
 
     fn get_measured_parameter_value(&mut self, index: usize) -> Result<f64, ()> {
-        if (self.measured_parameter_values[index] == f64::MAX) {
+        if self.measured_parameter_values[index] == f64::MAX {
             Err(())
         } else {
             Ok(self.measured_parameter_values[index])
@@ -169,18 +153,18 @@ impl SensorDriver for RingTemperatureDriver {
             self.sensor_drivers[sensor_index].get_measured_parameter_identifier(parameter_index);
 
         let mut buf2: [u8; 16] = [0; 16];
-        let name = "RING_".as_bytes();
-        // rprint!(core::str::from_utf8(&buf2).unwrap());
-        // buf2[0..5].copy_from_slice(&name[0..5]);
-        // rprint!(core::str::from_utf8(&buf2).unwrap());
-        // rprint!(core::str::from_utf8(&buf[0..12]).unwrap());
         buf2[0..10].copy_from_slice(&buf[0..10]);
-        buf2[11] = INDEX_TO_BYTE_CHAR[sensor_index];
-        buf2[12] = b'\0';
+        let mut end = buf2
+                        .iter()
+                        .position(|&x| x == b'\0')
+                        .unwrap_or_else(|| 1);
+        if end >= 14 { end = 14 }
+        buf2[end] = INDEX_TO_BYTE_CHAR[sensor_index];
+        buf2[end+1] = b'\0';
         return buf2;
     }
 
-    fn take_measurement(&mut self, board: &mut dyn rriv_board::SensorDriverServices) {
+    fn take_measurement(&mut self, board: &mut dyn rriv_board::RRIVBoard) {
         for i in 0..TEMPERATURE_SENSORS_ON_RING {
             self.sensor_drivers[i].take_measurement(board);
             self.measured_parameter_values[i * 2] =
@@ -202,8 +186,7 @@ impl SensorDriver for RingTemperatureDriver {
         }
     }
     
-    fn update_actuators(&mut self, board: &mut dyn rriv_board::SensorDriverServices) {
-    }
+   
 
     fn fit(&mut self, pairs: &[CalibrationPair]) -> Result<(), ()> {
         // validate
@@ -213,7 +196,7 @@ impl SensorDriver for RingTemperatureDriver {
 
         if pairs[0].values.len() < 6 {
             // TODO: check for zeros, not for len().  len is constant
-            rprint!("not enough values to calibrate");
+            defmt::println!("not enough values to calibrate");
             return Err(());
         }
 
@@ -235,4 +218,5 @@ impl SensorDriver for RingTemperatureDriver {
         }
         Ok(())
     }
+
 }

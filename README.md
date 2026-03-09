@@ -1,10 +1,10 @@
-# RRIV Rust
-
-RRIV platform firmware, written in Rust.
+# RRIV Firmware
+  
+RRIV embedded firmware, written in Rust.
 
 [![chat](https://img.shields.io/badge/chat-probe--rs%3Amatrix.org-brightgreen)](https://matrix.to/#/#rriv-rust:matrix.x24.tools)
 
-## Getting Started / Development Setup
+# Getting Started / Development Setup
 
 You will need to install the Rust toolchain. The easiest way to do this is with [rustup](https://rustup.rs/).
 
@@ -13,8 +13,8 @@ You will need the nightly toolchain since Rust on embedded needs unstable featur
 rustup toolchain install nightly
 ```
 ```zsh
-rustup target add thumbv7m-none-eabi
 rustup default nightly
+rustup target add thumbv7m-none-eabi
 rustup update
 ```
 You can also list and set the toolchain directly like so:
@@ -37,8 +37,6 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/probe-rs/probe-rs/relea
 
 Users of VSCode will also want to install the following extensions:
 * rust-analyzer
-* ~~probe-rs-debugger~~: This is now installed with probe-rs.
-* crates
 
 
 
